@@ -1,0 +1,79 @@
+name: BB Terminal
+
+on:
+  schedule:
+    - cron: "30 3 * * 1-5"       # 09:00 IST  morning reminder
+    - cron: "*/20 4-9 * * 1-5"   # every 20 min, 09:30–15:30 IST  live scan
+    - cron: "20 11 * * 1-5"      # 16:50 IST  after the close: confirmed signals
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "eod, intraday or morning"
+        default: "eod"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: bb-terminal
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unpack the app
+        run: python bundle.py
+      - run: pip install -r requirements.txt
+      - name: Restore price history
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache
+          key: bb-cache-${{ github.run_id }}
+          restore-keys: bb-cache-
+      - name: Pick mode
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          case "${{ github.event.schedule }}" in
+            "30 3 * * 1-5")  MODE=morning ;;
+            "20 11 * * 1-5") MODE=eod ;;
+            "*/20 4-9 * * 1-5") MODE=intraday ;;
+          esac
+          echo "MODE=${MODE:-eod}" >> $GITHUB_ENV
+      - name: Run the terminal
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python -m bbsys.build "$MODE"
+      - name: Save price history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: bb-cache-${{ github.run_id }}
+      - name: Record the day (keeps the schedule active)
+        if: env.MODE == 'eod'
+        run: |
+          git config user.name "bb-terminal-bot"
+          git config user.email "bb-terminal-bot@users.noreply.github.com"
+          git add log/ || true
+          git diff --cached --quiet || (git commit -m "Daily log $(date -u +%F)" && git push)
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
