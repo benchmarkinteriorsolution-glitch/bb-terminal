@@ -2,9 +2,10 @@ name: BB Terminal
 
 on:
   schedule:
-    - cron: "30 3 * * 1-5"       # 09:00 IST  morning reminder
+    - cron: "0 2 * * 1-5"        # 07:30 IST  morning reminder (early: GitHub runs can be ~1 h late)
     - cron: "*/20 4-9 * * 1-5"   # every 20 min, 09:30–15:30 IST  live scan
     - cron: "20 11 * * 1-5"      # 16:50 IST  after the close: confirmed signals
+    - cron: "30 13 * * 1-5"      # 19:00 IST  backup run if the first one is skipped
   workflow_dispatch:
     inputs:
       mode:
@@ -42,8 +43,8 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           case "${{ github.event.schedule }}" in
-            "30 3 * * 1-5")  MODE=morning ;;
-            "20 11 * * 1-5") MODE=eod ;;
+            "0 2 * * 1-5")   MODE=morning ;;
+            "20 11 * * 1-5"|"30 13 * * 1-5") MODE=eod ;;
             "*/20 4-9 * * 1-5") MODE=intraday ;;
           esac
           echo "MODE=${MODE:-eod}" >> $GITHUB_ENV
