@@ -23,6 +23,8 @@ FIXES = [
     ("site/index.html",
      "${x.kind==='BUY'?'Stop (close)':''}</div>${x.kind==='BUY'&&x.stop?'<span class=\"dn\">'+inr(x.stop)+'</span>':''}",
      "${x.kind!=='BUY'?'':x.stop?'Stop (close)':'Exit rule'}</div>${x.kind!=='BUY'?'':x.stop?'<span class=\"dn\">'+inr(x.stop)+'</span>':'Quarterly review'}"),
+    ("config.json", '"start_date": "2026-11-25"', '"start_date": "2026-11-23"'),
+    ("bbsys/build.py", ": monthly rebalance\"", ": quarterly rebalance\""),
 ]
 for path, old, new in FIXES:
     s = open(path, encoding="utf-8").read()
